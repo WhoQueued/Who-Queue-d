@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Who Queue'd?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Space+Mono:wght@400;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0f0e14;
+    --ink-2:#1c1a24;
+    --ink-3:#242130;
+    --paper:#f3ead9;
+    --paper-dim:#c9bfa9;
+    --amber:#e8ac3e;
+    --amber-ink:#20140a;
+    --teal:#3f9a86;
+    --red:#c1443c;
+    --line:rgba(243,234,217,0.14);
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    min-height:100dvh;
+    background:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(232,172,62,0.10), transparent 60%),
+      radial-gradient(ellipse at top, #1c1a24, #0b0a10 75%);
+    color:var(--paper);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  #app{ min-height:100dvh; }
+  button, input{ font-family:inherit; color:inherit; }
+  input{ accent-color:var(--amber); }
+  *:focus-visible{ outline:2px solid var(--amber); outline-offset:2px; }
+
+  .scene{
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+    max-width:520px;
+    margin:0 auto;
+    padding:28px 18px 48px;
+    position:relative;
+    animation: fadeIn .35s ease both;
+  }
+  @keyframes fadeIn{ from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);} }
+
+  .pageheader{ text-align:center; padding-top:6px; }
+  .pageheader__brand{ font-family:'Space Mono',monospace; font-size:.65rem; letter-spacing:3px; color:var(--amber); margin:0 0 6px; }
+  .pageheader__title{ font-family:'Oswald',sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:1px; font-size:1.5rem; margin:0; }
+  .pageheader__sub{ font-family:'Space Mono',monospace; font-size:.75rem; color:var(--paper-dim); margin:6px 0 0; }
+
+  .card{
+    background:var(--ink-2);
+    border:1px solid var(--line);
+    border-radius:18px;
+    padding:22px 20px;
+    box-shadow:0 20px 44px rgba(0,0,0,.38);
+    position:relative;
+    overflow:hidden;
+  }
+
+  /* --- cover / home & end --- */
+  .scene--home{ justify-content:center; }
+  .card--cover{ text-align:center; padding:34px 24px 28px; }
+  .spotlight{
+    position:absolute; top:-30%; left:50%; transform:translateX(-50%);
+    width:160%; aspect-ratio:1;
+    background: radial-gradient(circle, rgba(232,172,62,0.28), rgba(232,172,62,0) 62%);
+    filter: blur(2px);
+    pointer-events:none;
+    animation: spotlightPulse 6s ease-in-out infinite;
+  }
+  @keyframes spotlightPulse{ 0%,100%{opacity:.65;} 50%{opacity:1;} }
+  .eyebrow{ position:relative; font-family:'Space Mono',monospace; font-size:.7rem; letter-spacing:3px; color:var(--amber); text-transform:uppercase; margin:0 0 10px; }
+  .wordmark{ position:relative; font-family:'Oswald',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:1px; font-size:clamp(2.3rem,11vw,3.3rem); line-height:.95; margin:0 0 18px; }
+  .wordmark--sm{ font-size:clamp(1.8rem,9vw,2.4rem); }
+
+  .vinyl{
+    position:relative;
+    width:92px; height:92px; border-radius:50%; margin:0 auto 18px;
+    background: repeating-radial-gradient(circle at center, #2a2733 0 2px, #1a1822 2px 5px);
+    box-shadow: 0 0 0 3px rgba(232,172,62,0.18), 0 12px 26px rgba(0,0,0,.4);
+  }
+  .vinyl__label{ position:absolute; inset:34%; border-radius:50%; background:var(--amber); box-shadow:inset 0 0 0 3px var(--ink-2); }
+  .vinyl--spin{ animation: spin 2.6s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .rules{ position:relative; text-align:left; list-style:none; margin:0 0 24px; padding:0; display:flex; flex-direction:column; gap:12px; }
+  .rules li{ font-size:.9rem; line-height:1.4; color:var(--paper-dim); display:flex; gap:10px; }
+  .rules__num{ font-family:'Space Mono',monospace; color:var(--amber); font-weight:700; flex-shrink:0; }
+
+  /* --- buttons --- */
+  .btn{ border:none; border-radius:12px; padding:14px 18px; font-size:.92rem; font-weight:600; cursor:pointer; transition:transform .15s ease, opacity .15s ease; }
+  .btn--block{ width:100%; }
+  .btn--primary{ background:var(--amber); color:var(--amber-ink); }
+  .btn--primary:hover:not(:disabled){ transform:translateY(-1px); }
+  .btn--primary:disabled{ opacity:.35; cursor:not-allowed; }
+  .btn--ghost{ background:transparent; border:1px solid var(--line); color:var(--paper); }
+  .btn--amber{ background:transparent; border:1px solid var(--amber); color:var(--amber); }
+
+  .nav-row{ display:flex; gap:10px; }
+  .nav-row .btn{ flex:1; }
+  .nav-row--stack{ flex-direction:column; }
+
+  /* --- players / setup --- */
+  .field-row{ display:flex; gap:8px; margin-bottom:16px; }
+  .field-col{ display:flex; flex-direction:column; gap:10px; margin-bottom:16px; }
+  .input{
+    flex:1; background:var(--ink-3); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; font-size:.9rem; color:var(--paper);
+  }
+  .input::placeholder{ color:var(--paper-dim); }
+  .input--shake{ animation: shake .35s ease; border-color:var(--red); }
+  @keyframes shake{ 0%,100%{transform:translateX(0);} 25%{transform:translateX(-4px);} 75%{transform:translateX(4px);} }
+
+  .chiplist{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .chip{ display:flex; align-items:center; gap:10px; background:var(--ink-3); border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .chip__num{ font-family:'Space Mono',monospace; font-size:.7rem; color:var(--amber); }
+  .chip__label{ flex:1; font-weight:500; }
+  .chip__remove{ background:none; border:none; color:var(--paper-dim); font-size:1.1rem; cursor:pointer; line-height:1; padding:2px 6px; }
+  .chip__remove:hover{ color:var(--red); }
+
+  .empty{ text-align:center; padding:20px 8px; }
+  .empty__title{ margin:0 0 4px; font-weight:600; }
+  .empty__sub{ margin:0; font-size:.82rem; color:var(--paper-dim); }
+
+  /* --- queue turn / gate --- */
+  .card--gate{ text-align:center; padding:36px 20px; }
+  .gate__pass{ font-family:'Space Mono',monospace; font-size:.75rem; letter-spacing:2px; color:var(--paper-dim); text-transform:uppercase; margin:0 0 6px; }
+  .gate__name{ font-family:'Oswald',sans-serif; font-size:2rem; text-transform:uppercase; margin:0 0 14px; }
+  .gate__hint{ font-size:.85rem; color:var(--paper-dim); margin:0 0 22px; }
+
+  .evidence-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .evidence{ display:flex; align-items:center; gap:10px; background:var(--ink-3); border:1px dashed var(--line); border-radius:10px; padding:10px 12px; }
+  .evidence__text{ flex:1; font-family:'Space Mono',monospace; font-size:.8rem; }
+  .evidence__artist{ color:var(--paper-dim); }
+
+  /* --- ready / settings --- */
+  .card--ready{ text-align:center; }
+  .ready__count{ font-family:'Oswald',sans-serif; font-size:3rem; margin:0; color:var(--amber); }
+  .ready__label{ margin:0 0 16px; color:var(--paper-dim); font-size:.85rem; }
+  .reminder{ font-size:.82rem; line-height:1.5; color:var(--paper-dim); background:var(--ink-3); border-radius:10px; padding:12px 14px; margin:0 0 18px; text-align:left; }
+  details.settings{ text-align:left; }
+  details.settings summary{ cursor:pointer; font-weight:600; font-size:.85rem; color:var(--amber); margin-bottom:10px; }
+  .settings__row{ display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-top:1px solid var(--line); font-size:.85rem; }
+  .stepper{ display:flex; align-items:center; gap:10px; font-family:'Space Mono',monospace; }
+  .stepper button{ background:var(--ink-3); border:1px solid var(--line); color:var(--paper); width:26px; height:26px; border-radius:6px; cursor:pointer; font-size:1rem; }
+  .toggle{ width:42px; height:24px; border-radius:999px; background:var(--ink-3); border:1px solid var(--line); position:relative; cursor:pointer; }
+  .toggle::after{ content:''; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:var(--paper-dim); transition:transform .15s ease, background .15s ease; }
+  .toggle--on{ background:rgba(232,172,62,0.25); border-color:var(--amber); }
+  .toggle--on::after{ transform:translateX(18px); background:var(--amber); }
+
+  /* --- round --- */
+  .scorestrip{ display:flex; gap:8px; overflow-x:auto; padding-bottom:2px; }
+  .scorepill{ flex-shrink:0; background:var(--ink-2); border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-family:'Space Mono',monospace; font-size:.72rem; white-space:nowrap; }
+  .scorepill b{ color:var(--amber); }
+
+  .card--track{ text-align:center; }
+  .track__title{ font-family:'Oswald',sans-serif; font-size:1.5rem; text-transform:uppercase; margin:0 0 2px; }
+  .track__artist{ color:var(--paper-dim); font-size:.85rem; margin:0; }
+
+  .section-label{ font-family:'Space Mono',monospace; font-size:.72rem; letter-spacing:2px; text-transform:uppercase; color:var(--paper-dim); margin:0 0 14px; }
+  .suspects{ display:flex; flex-direction:column; gap:16px; margin-bottom:18px; }
+  .suspect-block__name{ font-size:.85rem; font-weight:600; margin:0 0 8px; }
+  .suspect-options{ display:flex; flex-wrap:wrap; gap:8px; }
+  .suspect-chip{ background:var(--ink-3); border:1px solid var(--line); color:var(--paper); border-radius:999px; padding:7px 14px; font-size:.8rem; cursor:pointer; }
+  .suspect-chip--selected{ background:var(--amber); border-color:var(--amber); color:var(--amber-ink); font-weight:700; }
+
+  .card--reveal{ text-align:center; }
+  .spotlight--reveal{ animation: spotlightIn .5s ease-out; }
+  @keyframes spotlightIn{ from{opacity:0; transform:translateX(-50%) scale(.7);} to{opacity:1; transform:translateX(-50%) scale(1);} }
+  .reveal__caption{ position:relative; font-family:'Space Mono',monospace; font-size:.7rem; letter-spacing:3px; color:var(--amber); margin:0 0 6px; }
+  .reveal__name{ position:relative; font-family:'Oswald',sans-serif; font-size:2rem; text-transform:uppercase; margin:0 0 18px; }
+  .verdicts{ position:relative; list-style:none; margin:0 0 20px; padding:0; display:flex; flex-direction:column; gap:8px; text-align:left; }
+  .verdict{ display:flex; justify-content:space-between; align-items:center; background:var(--ink-3); border-radius:10px; padding:10px 12px; font-size:.82rem; }
+  .verdict--hit{ border-left:3px solid var(--teal); }
+  .verdict--miss{ border-left:3px solid var(--red); }
+  .verdict__pts{ font-family:'Space Mono',monospace; font-weight:700; }
+  .verdict--hit .verdict__pts{ color:var(--teal); }
+  .verdict--miss .verdict__pts{ color:var(--red); }
+
+  /* --- end --- */
+  .leaderboard{ position:relative; list-style:none; margin:0 0 22px; padding:0; display:flex; flex-direction:column; gap:8px; }
+  .leaderboard__row{ display:flex; align-items:center; gap:12px; background:var(--ink-3); border-radius:10px; padding:10px 14px; }
+  .leaderboard__row--top{ border:1px solid var(--amber); }
+  .leaderboard__rank{ font-family:'Space Mono',monospace; color:var(--paper-dim); width:18px; }
+  .leaderboard__name{ flex:1; font-weight:600; text-align:left; }
+  .leaderboard__score{ font-family:'Space Mono',monospace; font-weight:700; color:var(--amber); }
+
+  @media (prefers-reduced-motion: reduce){
+    *, *::before, *::after{ animation-duration:.001ms !important; animation-iteration-count:1 !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+  "use strict";
+  const APP = document.getElementById('app');
+  let uid = 0;
+  const nextId = () => 'id' + (++uid) + Math.random().toString(36).slice(2,7);
+
+  function defaultState(){
+    return {
+      screen: 'home',
+      players: [],
+      queue: [],
+      turnIndex: 0,
+      turnRevealed: false,
+      settings: { correctPts: 1, forfeitPts: 1, skipSelf: true },
+      order: [],
+      roundIndex: 0,
+      guesses: {},
+      revealed: false,
+    };
+  }
+  let state = defaultState();
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function shuffle(arr){
+    const a = arr.slice();
+    for(let i=a.length-1;i>0;i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i],a[j]] = [a[j],a[i]];
+    }
+    return a;
+  }
+  function header(title, sub){
+    return `<div class="pageheader">
+      <p class="pageheader__brand">WHO QUEUE'D?</p>
+      <h2 class="pageheader__title">${title}</h2>
+      ${sub ? `<p class="pageheader__sub">${sub}</p>` : ''}
+    </div>`;
+  }
+  function emptyState(title, sub){
+    return `<div class="empty"><p class="empty__title">${title}</p><p class="empty__sub">${sub}</p></div>`;
+  }
+  function scoreStrip(){
+    const sorted = state.players.slice().sort((a,b)=>b.score-a.score);
+    return `<div class="scorestrip">${sorted.map(p=>`<span class="scorepill">${escapeHtml(p.name)} <b>${p.score}</b></span>`).join('')}</div>`;
+  }
+
+  const screens = {};
+
+  screens.home = () => `
+    <div class="scene scene--home">
+      <div class="spotlight" aria-hidden="true"></div>
+      <div class="card card--cover">
+        <p class="eyebrow">A PARTY WHODUNIT FOR YOUR PLAYLIST</p>
+        <h1 class="wordmark">WHO<br/>QUEUE'D?</h1>
+        <div class="vinyl" aria-hidden="true"><div class="vinyl__label"></div></div>
+        <ol class="rules">
+          <li><span class="rules__num">01</span>Everyone queues songs onto one shared playlist on Spotify or Apple Music.</li>
+          <li><span class="rules__num">02</span>Log each song here too, secretly, under your own name.</li>
+          <li><span class="rules__num">03</span>Shuffle the real playlist, hit play on the speaker, and open a case each time a new track drops.</li>
+          <li><span class="rules__num">04</span>Guess who queue'd it. Right hunches score points, wrong ones cost you.</li>
+        </ol>
+        <button class="btn btn--primary btn--block" data-action="go-players">Open a New Case</button>
+      </div>
+    </div>`;
+
+  screens.players = () => `
+    <div class="scene">
+      ${header('Suspect Roster', 'Round up your players')}
+      <div class="card">
+        <div class="field-row">
+          <input id="playerName" class="input" placeholder="Type a name…" maxlength="20" data-enter="add-player" />
+          <button class="btn btn--amber" data-action="add-player" type="button">Add</button>
+        </div>
+        ${state.players.length === 0 ? emptyState('No suspects yet.', 'Add at least 2 to open the case.') : `
+        <ul class="chiplist">
+          ${state.players.map((p,i)=>`
+            <li class="chip">
+              <span class="chip__num">#${i+1}</span>
+              <span class="chip__label">${escapeHtml(p.name)}</span>
+              <button class="chip__remove" data-action="remove-player" data-id="${p.id}" type="button" aria-label="Remove ${escapeHtml(p.name)}">×</button>
+            </li>`).join('')}
+        </ul>`}
+      </div>
+      <div class="nav-row">
+        <button class="btn btn--ghost" data-action="go-home" type="button">Back</button>
+        <button class="btn btn--primary" data-action="go-queue" type="button" ${state.players.length<2?'disabled':''}>Queue the Songs →</button>
+      </div>
+    </div>`;
+
+  screens.queueTurn = () => {
+    if(state.turnIndex >= state.players.length){ state.screen='ready'; return screens.ready(); }
+    const player = state.players[state.turnIndex];
+    if(!state.turnRevealed){
+      return `
+      <div class="scene scene--home">
+        ${header('Case File Handoff','')}
+        <div class="card card--gate">
+          <p class="gate__pass">Pass the phone to</p>
+          <h2 class="gate__name">${escapeHtml(player.name)}</h2>
+          <p class="gate__hint">Everyone else, look away — this suspect is about to queue songs in secret.</p>
+          <button class="btn btn--primary btn--block" data-action="reveal-turn" type="button">I'm ${escapeHtml(player.name)} — Show My Form</button>
+        </div>
+      </div>`;
+    }
+    const mySongs = state.queue.filter(s=>s.ownerId===player.id);
+    return `
+    <div class="scene">
+      ${header(`${escapeHtml(player.name)}'s Turn`, `Suspect ${state.turnIndex+1} of ${state.players.length}`)}
+      <div class="card">
+        <div class="field-col">
+          <input id="songTitle" class="input" placeholder="Song title" maxlength="60" data-enter="add-song" />
+          <input id="songArtist" class="input" placeholder="Artist (optional)" maxlength="40" data-enter="add-song" />
+          <button class="btn btn--amber btn--block" data-action="add-song" type="button">+ Add to Queue</button>
+        </div>
+        ${mySongs.length===0 ? emptyState('No songs logged yet.', 'Add at least one before passing on.') : `
+        <ul class="evidence-list">
+          ${mySongs.map(s=>`
+            <li class="evidence">
+              <div class="evidence__text"><span>${escapeHtml(s.title)}</span>${s.artist?`<span class="evidence__artist"> — ${escapeHtml(s.artist)}</span>`:''}</div>
+              <button class="chip__remove" data-action="remove-song" data-id="${s.id}" type="button" aria-label="Remove">×</button>
+            </li>`).join('')}
+        </ul>`}
+      </div>
+      <div class="nav-row">
+        <button class="btn btn--primary btn--block" data-action="done-turn" type="button" ${mySongs.length===0?'disabled':''}>Done — Pass It On</button>
+      </div>
+    </div>`;
+  };
+
+  screens.ready = () => `
+    <div class="scene">
+      ${header("The Case Is Set",'')}
+      <div class="card card--ready">
+        <p class="ready__count">${state.queue.length}</p>
+        <p class="ready__label">songs in the queue from ${state.players.length} suspects</p>
+        <p class="reminder">☝️ Now queue those same songs on your <strong>Spotify</strong> or <strong>Apple Music</strong> playlist, shuffle it, and hit play on the speaker. This app runs the guessing and scoring alongside whatever's playing.</p>
+        <details class="settings">
+          <summary>Case Settings</summary>
+          <div class="settings__row">
+            <label>Points for a correct guess</label>
+            <div class="stepper">
+              <button data-action="dec-correct" type="button">−</button><span>${state.settings.correctPts}</span><button data-action="inc-correct" type="button">+</button>
+            </div>
+          </div>
+          <div class="settings__row">
+            <label>Forfeit for a wrong guess</label>
+            <div class="stepper">
+              <button data-action="dec-forfeit" type="button">−</button><span>${state.settings.forfeitPts}</span><button data-action="inc-forfeit" type="button">+</button>
+            </div>
+          </div>
+          <div class="settings__row">
+            <label>Skip the owner's own song</label>
+            <button class="toggle ${state.settings.skipSelf?'toggle--on':''}" data-action="toggle-skip" type="button" role="switch" aria-checked="${state.settings.skipSelf}"></button>
+          </div>
+        </details>
+      </div>
+      <div class="nav-row">
+        <button class="btn btn--ghost" data-action="go-players" type="button">Back to Roster</button>
+        <button class="btn btn--primary" data-action="start-game" type="button" ${state.queue.length<2?'disabled':''}>Shuffle &amp; Start →</button>
+      </div>
+    </div>`;
+
+  screens.round = () => {
+    if(state.roundIndex >= state.order.length) return screens.end();
+    const songId = state.order[state.roundIndex];
+    const song = state.queue.find(s=>s.id===songId);
+    const owner = state.players.find(p=>p.id===song.ownerId);
+    const guessers = state.players.filter(p=> !(state.settings.skipSelf && p.id===owner.id));
+    const allAnswered = guessers.every(p=> state.guesses[p.id]);
+    const waitingOn = guessers.filter(p=>!state.guesses[p.id]).map(p=>p.name).join(', ');
+
+    return `
+    <div class="scene">
+      ${header(`Round ${state.roundIndex+1} of ${state.order.length}`, '')}
+      ${scoreStrip()}
+      <div class="card card--track">
+        <div class="vinyl ${state.revealed?'':'vinyl--spin'}" aria-hidden="true"><div class="vinyl__label"></div></div>
+        <p class="eyebrow">NOW PLAYING</p>
+        <h2 class="track__title">${escapeHtml(song.title)}</h2>
+        ${song.artist?`<p class="track__artist">${escapeHtml(song.artist)}</p>`:''}
+      </div>
+      ${!state.revealed ? `
+      <div class="card">
+        <p class="section-label">Who queue'd it?</p>
+        <div class="suspects">
+          ${guessers.map(g=>`
+            <div class="suspect-block">
+              <p class="suspect-block__name">${escapeHtml(g.name)}'s guess</p>
+              <div class="suspect-options">
+                ${state.players.map(target=>`
+                  <button class="suspect-chip ${state.guesses[g.id]===target.id?'suspect-chip--selected':''}" data-action="guess" data-guesser="${g.id}" data-target="${target.id}" type="button">${escapeHtml(target.name)}</button>
+                `).join('')}
+              </div>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn--primary btn--block" data-action="reveal-answer" type="button" ${allAnswered?'':'disabled'}>${allAnswered ? "Reveal the Queue'r" : `Waiting on ${escapeHtml(waitingOn)}`}</button>
+      </div>` : `
+      <div class="card card--reveal">
+        <div class="spotlight spotlight--reveal" aria-hidden="true"></div>
+        <p class="reveal__caption">IT WAS</p>
+        <h3 class="reveal__name">${escapeHtml(owner.name)}</h3>
+        <ul class="verdicts">
+          ${guessers.map(g=>{
+            const correct = state.guesses[g.id]===owner.id;
+            const guessedName = state.players.find(p=>p.id===state.guesses[g.id]);
+            return `<li class="verdict verdict--${correct?'hit':'miss'}">
+              <span>${escapeHtml(g.name)} guessed ${escapeHtml(guessedName?guessedName.name:'—')}</span>
+              <span class="verdict__pts">${correct? '+'+state.settings.correctPts : '−'+state.settings.forfeitPts}</span>
+            </li>`;
+          }).join('')}
+        </ul>
+        <button class="btn btn--primary btn--block" data-action="next-round" type="button">${state.roundIndex+1>=state.order.length ? 'Close the Case →' : 'Next Song →'}</button>
+      </div>`}
+    </div>`;
+  };
+
+  screens.end = () => {
+    const sorted = state.players.slice().sort((a,b)=>b.score-a.score);
+    const top = sorted.length ? sorted[0].score : 0;
+    return `
+    <div class="scene scene--home">
+      <div class="spotlight" aria-hidden="true"></div>
+      <div class="card card--cover">
+        <p class="eyebrow">CASE CLOSED</p>
+        <h1 class="wordmark wordmark--sm">FINAL<br/>VERDICT</h1>
+        <ul class="leaderboard">
+          ${sorted.map((p,i)=>`
+            <li class="leaderboard__row ${p.score===top?'leaderboard__row--top':''}">
+              <span class="leaderboard__rank">${i+1}</span>
+              <span class="leaderboard__name">${escapeHtml(p.name)}${p.score===top?' 👑':''}</span>
+              <span class="leaderboard__score">${p.score}</span>
+            </li>`).join('')}
+        </ul>
+        <div class="nav-row nav-row--stack">
+          <button class="btn btn--primary btn--block" data-action="replay-same" type="button">Same Suspects, New Case</button>
+          <button class="btn btn--ghost btn--block" data-action="go-home-reset" type="button">Start Fresh</button>
+        </div>
+      </div>
+    </div>`;
+  };
+
+  function render(){
+    APP.innerHTML = screens[state.screen]();
+  }
+
+  function flashInvalid(el){
+    if(!el) return;
+    el.classList.add('input--shake');
+    setTimeout(()=>el.classList.remove('input--shake'), 400);
+  }
+
+  const handlers = {
+    'go-players': () => { state.screen='players'; render(); },
+    'go-home': () => { state.screen='home'; render(); },
+    'go-home-reset': () => { state = defaultState(); render(); },
+    'add-player': () => {
+      const input = document.getElementById('playerName');
+      const name = input.value.trim();
+      if(!name){ flashInvalid(input); return; }
+      if(state.players.some(p=>p.name.toLowerCase()===name.toLowerCase())){ flashInvalid(input); return; }
+      state.players.push({ id: nextId(), name, score: 0 });
+      render();
+      const el = document.getElementById('playerName');
+      if(el) el.focus();
+    },
+    'remove-player': (btn) => {
+      const id = btn.dataset.id;
+      state.players = state.players.filter(p=>p.id!==id);
+      state.queue = state.queue.filter(s=>s.ownerId!==id);
+      render();
+    },
+    'go-queue': () => { state.screen='queueTurn'; state.turnIndex=0; state.turnRevealed=false; render(); },
+    'reveal-turn': () => {
+      state.turnRevealed = true;
+      render();
+      const el = document.getElementById('songTitle');
+      if(el) el.focus();
+    },
+    'add-song': () => {
+      const t = document.getElementById('songTitle');
+      const a = document.getElementById('songArtist');
+      const title = t.value.trim();
+      const artist = a.value.trim();
+      if(!title){ flashInvalid(t); return; }
+      const player = state.players[state.turnIndex];
+      state.queue.push({ id: nextId(), title, artist, ownerId: player.id });
+      render();
+      const el = document.getElementById('songTitle');
+      if(el) el.focus();
+    },
+    'remove-song': (btn) => {
+      state.queue = state.queue.filter(s=>s.id!==btn.dataset.id);
+      render();
+    },
+    'done-turn': () => {
+      state.turnIndex++;
+      state.turnRevealed = false;
+      if(state.turnIndex >= state.players.length){ state.screen = 'ready'; }
+      render();
+    },
+    'inc-correct': () => { state.settings.correctPts = Math.min(5, state.settings.correctPts+1); render(); },
+    'dec-correct': () => { state.settings.correctPts = Math.max(1, state.settings.correctPts-1); render(); },
+    'inc-forfeit': () => { state.settings.forfeitPts = Math.min(5, state.settings.forfeitPts+1); render(); },
+    'dec-forfeit': () => { state.settings.forfeitPts = Math.max(0, state.settings.forfeitPts-1); render(); },
+    'toggle-skip': () => { state.settings.skipSelf = !state.settings.skipSelf; render(); },
+    'start-game': () => {
+      state.order = shuffle(state.queue.map(s=>s.id));
+      state.roundIndex = 0;
+      state.guesses = {};
+      state.revealed = false;
+      state.screen = 'round';
+      render();
+    },
+    'guess': (btn) => {
+      const g = btn.dataset.guesser, target = btn.dataset.target;
+      state.guesses[g] = target;
+      render();
+    },
+    'reveal-answer': () => {
+      const songId = state.order[state.roundIndex];
+      const song = state.queue.find(s=>s.id===songId);
+      const owner = state.players.find(p=>p.id===song.ownerId);
+      const guessers = state.players.filter(p=> !(state.settings.skipSelf && p.id===owner.id));
+      guessers.forEach(g=>{
+        const correct = state.guesses[g.id] === owner.id;
+        const player = state.players.find(p=>p.id===g.id);
+        player.score += correct ? state.settings.correctPts : -state.settings.forfeitPts;
+      });
+      state.revealed = true;
+      render();
+    },
+    'next-round': () => {
+      state.roundIndex++;
+      state.guesses = {};
+      state.revealed = false;
+      if(state.roundIndex >= state.order.length){ state.screen = 'end'; }
+      render();
+    },
+    'replay-same': () => {
+      state.players.forEach(p=>p.score=0);
+      state.queue = [];
+      state.order = [];
+      state.roundIndex = 0;
+      state.guesses = {};
+      state.revealed = false;
+      state.turnIndex = 0;
+      state.turnRevealed = false;
+      state.screen = 'queueTurn';
+      render();
+    },
+  };
+
+  APP.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if(!btn) return;
+    const fn = handlers[btn.dataset.action];
+    if(fn) fn(btn, e);
+  });
+
+  APP.addEventListener('keydown', (e) => {
+    if(e.key !== 'Enter') return;
+    const target = e.target.closest('[data-enter]');
+    if(!target) return;
+    e.preventDefault();
+    const fn = handlers[target.dataset.enter];
+    if(fn) fn(target, e);
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
