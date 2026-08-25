@@ -1,6 +1,5 @@
-import { getValidAccessToken } from '../../../lib/session';
+import { getValidHostSession, getPlaylistId, savePlaylistId } from '../../../lib/rooms';
 import { getOrCreatePlaylist, addTrackToPlaylist } from '../../../lib/spotify';
-import { appendCookie } from '../../../lib/cookies';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -8,34 +7,27 @@ export default async function handler(req, res) {
     return;
   }
 
-  const session = await getValidAccessToken(req, res);
+  const { roomCode, trackUri } = req.body || {};
+  if (!roomCode || !trackUri) {
+    res.status(400).json({ error: 'missing_fields' });
+    return;
+  }
+
+  const session = await getValidHostSession(roomCode);
   if (!session) {
     res.status(401).json({ error: 'host_not_connected' });
     return;
   }
 
-  const { trackUri } = req.body || {};
-  if (!trackUri) {
-    res.status(400).json({ error: 'missing_track_uri' });
-    return;
-  }
-
   try {
-    // Reuse the same playlist for the whole game/night. It's created once
-    // and its id is cached in a cookie (not in server memory -- serverless
-    // functions don't reliably share memory between invocations).
-    let playlistId = req.cookies.whoqueued_playlist_id;
+    let playlistId = await getPlaylistId(roomCode);
 
     if (!playlistId) {
       playlistId = await getOrCreatePlaylist({
         accessToken: session.accessToken,
-        userId: session.userId,
         playlistName: "Who Queue'd?",
       });
-      appendCookie(
-        res,
-        `whoqueued_playlist_id=${playlistId}; Path=/; Max-Age=2592000; SameSite=Lax`
-      );
+      await savePlaylistId(roomCode, playlistId);
     }
 
     await addTrackToPlaylist({

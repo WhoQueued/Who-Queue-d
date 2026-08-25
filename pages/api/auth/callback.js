@@ -1,4 +1,5 @@
 import { exchangeCodeForToken, getCurrentUser } from '../../../lib/spotify';
+import { createRoom } from '../../../lib/rooms';
 import { appendCookie } from '../../../lib/cookies';
 
 export default async function handler(req, res) {
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
 
     const user = await getCurrentUser(tokenData.access_token);
 
-    const session = {
+    const hostSession = {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
       expiresAt: Date.now() + tokenData.expires_in * 1000,
@@ -34,17 +35,16 @@ export default async function handler(req, res) {
       displayName: user.display_name || user.id,
     };
 
-    appendCookie(
-      res,
-      `spotify_session=${Buffer.from(JSON.stringify(session)).toString(
-        'base64'
-      )}; HttpOnly; Path=/; Max-Age=2592000; SameSite=Lax`
-    );
+    // The host's tokens live server-side from here on, keyed by room code
+    // -- not in a cookie on this browser. That's what lets every player's
+    // own phone (not just this one) trigger real playlist writes later.
+    const roomCode = await createRoom({ hostSession });
+
     // Clean up the short-lived PKCE cookies now that we're done with them.
     appendCookie(res, 'spotify_verifier=; Path=/; Max-Age=0');
     appendCookie(res, 'spotify_state=; Path=/; Max-Age=0');
 
-    res.redirect('/?connected=1');
+    res.redirect(`/room/${roomCode}?justHosted=1`);
   } catch (err) {
     console.error(err);
     res.redirect('/?auth_error=token_exchange_failed');

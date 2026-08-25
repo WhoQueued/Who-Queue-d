@@ -268,6 +268,16 @@ input {
   flex-direction: column;
 }
 
+.or-divider {
+  text-align: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--paper-dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin: 4px 0;
+}
+
 /* --- players / setup --- */
 .field-row {
   display: flex;
