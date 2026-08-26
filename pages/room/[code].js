@@ -16,6 +16,46 @@ function shuffle(arr) {
   return a;
 }
 
+// Resizes a picked image to a small square JPEG data URL, entirely in the
+// browser -- no upload, no storage bucket needed. Keeps avatars small
+// enough to sit comfortably inside the room's JSONB state.
+function resizeImageFile(file, size = 96, quality = 0.6) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('read_failed'));
+    reader.onload = () => {
+      const img = new window.Image();
+      img.onerror = () => reject(new Error('image_failed'));
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function Avatar({ player, size = 32 }) {
+  const style = { width: size, height: size, fontSize: size * 0.42 };
+  if (player.avatar) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={player.avatar} alt="" className="avatar-img" style={style} />;
+  }
+  return (
+    <span className="avatar-fallback" style={style} aria-hidden="true">
+      {player.name.charAt(0).toUpperCase()}
+    </span>
+  );
+}
+
 export default function Room() {
   const router = useRouter();
   const { code } = router.query;
@@ -28,6 +68,8 @@ export default function Room() {
   const [myPlayerName, setMyPlayerName] = useState(null);
   const [nameInput, setNameInput] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [avatarError, setAvatarError] = useState('');
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
@@ -129,7 +171,13 @@ export default function Room() {
     }
 
     const id = uid();
-    const next = { ...fresh, players: [...fresh.players, { id, name: trimmed, score: 0 }] };
+    const next = {
+      ...fresh,
+      players: [
+        ...fresh.players,
+        { id, name: trimmed, score: 0, ready: false, avatar: avatarPreview || null },
+      ],
+    };
     setGameState(next);
     await supabase
       .from('rooms')
@@ -203,9 +251,29 @@ export default function Room() {
     pushUpdate((fresh) => ({ ...fresh, settings: { ...fresh.settings, ...patch } }));
   }
 
+  async function handleAvatarChange(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setAvatarError('');
+    try {
+      const dataUrl = await resizeImageFile(file);
+      setAvatarPreview(dataUrl);
+    } catch {
+      setAvatarError("Couldn't use that photo — try a different one.");
+    }
+  }
+
+  function toggleReady() {
+    pushUpdate((fresh) => ({
+      ...fresh,
+      players: fresh.players.map((p) => (p.id === myPlayerId ? { ...p, ready: !p.ready } : p)),
+    }));
+  }
+
   function startGame() {
     pushUpdate((fresh) => {
       if (fresh.queue.length < 2 || fresh.players.length < 2) return null;
+      if (!fresh.players.every((p) => p.ready)) return null;
       return {
         ...fresh,
         order: shuffle(fresh.queue.map((s) => s.id)),
@@ -266,7 +334,7 @@ export default function Room() {
   function replaySame() {
     pushUpdate((fresh) => ({
       ...fresh,
-      players: fresh.players.map((p) => ({ ...p, score: 0 })),
+      players: fresh.players.map((p) => ({ ...p, score: 0, ready: false })),
       queue: [],
       order: [],
       roundIndex: 0,
@@ -316,6 +384,28 @@ export default function Room() {
               }}
             />
           </div>
+
+          <div className="avatar-picker">
+            {avatarPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatarPreview} alt="" className="avatar-picker-preview" />
+            ) : (
+              <span className="avatar-picker-preview avatar-picker-preview-empty" aria-hidden="true">
+                {nameInput.trim() ? nameInput.trim().charAt(0).toUpperCase() : '?'}
+              </span>
+            )}
+            <label className="btn btn-ghost avatar-picker-btn">
+              {avatarPreview ? 'Change Photo' : 'Add a Photo (optional)'}
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                style={{ display: 'none' }}
+              />
+            </label>
+          </div>
+          {avatarError && <p className="hint hint-warn">{avatarError}</p>}
+
           {joinError && <p className="hint hint-warn">{joinError}</p>}
           <button className="btn btn-primary btn-block" onClick={joinAsPlayer} type="button">
             Join
@@ -332,6 +422,8 @@ export default function Room() {
 
   if (gameState.screen === 'lobby') {
     const mySongs = gameState.queue.filter((s) => s.ownerId === myPlayerId);
+    const myPlayer = gameState.players.find((p) => p.id === myPlayerId);
+    const notReady = gameState.players.filter((p) => !p.ready).map((p) => p.name).join(', ');
     return (
       <div className="scene">
         <PageHeader title="The Case File" sub={`Room code ${code}`} />
@@ -346,10 +438,22 @@ export default function Room() {
             {gameState.players.map((p, i) => (
               <li className="chip" key={p.id}>
                 <span className="chip-num">#{i + 1}</span>
+                <Avatar player={p} size={28} />
                 <span className="chip-label">{p.name}{p.id === myPlayerId ? ' (you)' : ''}</span>
+                <span className={`ready-badge ${p.ready ? 'ready-badge-on' : ''}`}>
+                  {p.ready ? 'Ready' : 'Not ready'}
+                </span>
               </li>
             ))}
           </ul>
+          <button
+            className={`btn btn-block ${myPlayer && myPlayer.ready ? 'btn-ghost' : 'btn-amber'}`}
+            style={{ marginTop: 12 }}
+            onClick={toggleReady}
+            type="button"
+          >
+            {myPlayer && myPlayer.ready ? "You're Ready ✓ (tap to undo)" : "I'm Ready"}
+          </button>
         </div>
 
         <div className="card">
@@ -439,9 +543,13 @@ export default function Room() {
           className="btn btn-primary btn-block"
           onClick={startGame}
           type="button"
-          disabled={gameState.queue.length < 2 || gameState.players.length < 2}
+          disabled={gameState.queue.length < 2 || gameState.players.length < 2 || notReady.length > 0}
         >
-          Shuffle &amp; Start the Case →
+          {gameState.queue.length < 2 || gameState.players.length < 2
+            ? 'Shuffle & Start the Case →'
+            : notReady.length > 0
+            ? `Waiting on ${notReady}`
+            : 'Shuffle & Start the Case →'}
         </button>
       </div>
     );
@@ -465,7 +573,7 @@ export default function Room() {
         <PageHeader title={`Round ${gameState.roundIndex + 1} of ${gameState.order.length}`} />
         <div className="scorestrip">
           {sortedScores.map((p) => (
-            <span className="scorepill" key={p.id}>{p.name} <b>{p.score}</b></span>
+            <span className="scorepill" key={p.id}><Avatar player={p} size={16} /> {p.name} <b>{p.score}</b></span>
           ))}
         </div>
 
@@ -493,6 +601,7 @@ export default function Room() {
                       className={`suspect-chip ${myGuess === target.id ? 'suspect-chip-selected' : ''}`}
                       onClick={() => submitGuess(target.id)}
                     >
+                      <Avatar player={target} size={20} />
                       {target.name}
                     </button>
                   ))}
@@ -509,6 +618,7 @@ export default function Room() {
                       className="suspect-chip"
                       onClick={() => submitGuess(target.id)}
                     >
+                      <Avatar player={target} size={20} />
                       {target.name}
                     </button>
                   ))}
@@ -530,14 +640,17 @@ export default function Room() {
           <div className="card card-reveal">
             <div className="spotlight spotlight-reveal" aria-hidden="true" />
             <p className="reveal-caption">IT WAS</p>
-            <h3 className="reveal-name">{owner.name}</h3>
+            <div className="reveal-owner">
+              <Avatar player={owner} size={48} />
+              <h3 className="reveal-name">{owner.name}</h3>
+            </div>
             <ul className="verdicts">
               {guessers.map((g) => {
                 const correct = gameState.guesses[g.id] === owner.id;
                 const guessedName = gameState.players.find((p) => p.id === gameState.guesses[g.id]);
                 return (
                   <li key={g.id} className={`verdict ${correct ? 'verdict-hit' : 'verdict-miss'}`}>
-                    <span>{g.name} guessed {guessedName ? guessedName.name : '—'}</span>
+                    <span className="verdict-who"><Avatar player={g} size={22} />{g.name} guessed {guessedName ? guessedName.name : '—'}</span>
                     <span className="verdict-pts">{correct ? `+${gameState.settings.correctPts}` : `−${gameState.settings.forfeitPts}`}</span>
                   </li>
                 );
@@ -565,6 +678,7 @@ export default function Room() {
           {sorted.map((p, i) => (
             <li key={p.id} className={`leaderboard-row ${p.score === top ? 'leaderboard-row-top' : ''}`}>
               <span className="leaderboard-rank">{i + 1}</span>
+              <Avatar player={p} size={28} />
               <span className="leaderboard-name">{p.name}{p.score === top ? ' 👑' : ''}</span>
               <span className="leaderboard-score">{p.score}</span>
             </li>

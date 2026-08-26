@@ -581,6 +581,9 @@ details.settings summary {
 }
 .scorepill {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   background: var(--ink-2);
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -633,11 +636,14 @@ details.settings summary {
   gap: 8px;
 }
 .suspect-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   background: var(--ink-3);
   border: 1px solid var(--line);
   color: var(--paper);
   border-radius: 999px;
-  padding: 7px 14px;
+  padding: 7px 14px 7px 7px;
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -672,6 +678,13 @@ details.settings summary {
   color: var(--amber);
   margin: 0 0 6px;
 }
+.reveal-owner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
 .reveal-name {
   position: relative;
   font-family: 'Oswald', sans-serif;
@@ -697,6 +710,11 @@ details.settings summary {
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 0.82rem;
+}
+.verdict-who {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .verdict-hit {
   border-left: 3px solid var(--teal);
@@ -750,6 +768,71 @@ details.settings summary {
   font-family: 'Space Mono', monospace;
   font-weight: 700;
   color: var(--amber);
+}
+
+/* --- avatars --- */
+.avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.avatar-fallback {
+  border-radius: 50%;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  color: var(--amber);
+  flex-shrink: 0;
+}
+.avatar-picker {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 16px;
+}
+.avatar-picker-preview {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.avatar-picker-preview-empty {
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  color: var(--paper-dim);
+  font-size: 1.2rem;
+}
+.avatar-picker-btn {
+  cursor: pointer;
+  padding: 10px 16px;
+}
+
+/* --- ready badge --- */
+.ready-badge {
+  margin-left: auto;
+  font-family: 'Space Mono', monospace;
+  font-size: 0.65rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--paper-dim);
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.ready-badge-on {
+  color: var(--teal);
+  border-color: var(--teal);
 }
 
 @media (prefers-reduced-motion: reduce) {
